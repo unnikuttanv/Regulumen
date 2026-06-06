@@ -1,0 +1,95 @@
+# ReguLumen — one-command local spin-up (API + UI) over a shared Chroma index.
+#
+#   docker compose build             # build the image ONCE (regulumen:latest)
+#   docker compose run --rm ingest   # populate ./.chroma (needs HF token)
+#   docker compose up api ui         # serve API on :8000 and UI on :7860
+#
+# IMPORTANT: only the `api` service carries a `build:` block — it is the single
+# producer of the `regulumen:latest` image. The `ui` and `ingest` services
+# REUSE that image (`pull_policy: never`, no build) so a `docker compose up`
+# never tries to build the same tag twice in parallel (which races BuildKit and
+# fails with `image "regulumen:latest": already exists`). Run `docker compose
+# build` (or start `api` first) before the reuse-only services.
+#
+# Both services read secrets/config from .env (REGULUMEN_ prefix), in particular
+# REGULUMEN_HF_API_TOKEN (embeddings) and REGULUMEN_GROQ_API_KEY (LLM). The
+# Chroma index is a bind-mounted volume so it persists and is shared between the
+# ingest job, the API, and the UI.
+
+services:
+  # The SINGLE image builder. All other services reuse the image it produces.
+  api:
+    build:
+      context: .
+      target: runtime
+    image: regulumen:latest
+    env_file: .env
+    environment:
+      REGULUMEN_CHROMA_PATH: /app/.chroma
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./.chroma:/app/.chroma
+    command:
+      - uvicorn
+      - regulumen.api.main:app
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8000"
+
+  # One-shot job: build the Chroma index from the bundled corpus, then exit.
+  # Reuses the api-built image; lives under the "ingest" profile so a plain
+  # `up` does not run it. Run `docker compose build` first.
+  ingest:
+    image: regulumen:latest
+    pull_policy: never
+    env_file: .env
+    environment:
+      REGULUMEN_CHROMA_PATH: /app/.chroma
+    volumes:
+      - ./.chroma:/app/.chroma
+    command: ["python", "scripts/ingest.py", "--chroma-path", "/app/.chroma"]
+    profiles: ["ingest"]
+
+  ui:
+    image: regulumen:latest
+    pull_policy: never
+    env_file: .env
+    environment:
+      REGULUMEN_CHROMA_PATH: /app/.chroma
+      # Gradio's launch() defaults to 127.0.0.1; these env vars make it bind on
+      # all interfaces inside the container without touching UI source.
+      GRADIO_SERVER_NAME: "0.0.0.0"
+      GRADIO_SERVER_PORT: "7860"
+    ports:
+      - "7860:7860"
+    volumes:
+      - ./.chroma:/app/.chroma
+    command: ["python", "-m", "regulumen.ui.app"]
+    depends_on:
+      - api
+
+  # ---------------------------------------------------------------------------
+  # Optional observability stub (per the spec roadmap). Commented out — enable
+  # and wire REGULUMEN_* / LANGFUSE_* env vars when adding tracing.
+  # ---------------------------------------------------------------------------
+  # langfuse:
+  #   image: langfuse/langfuse:latest
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     DATABASE_URL: postgresql://postgres:postgres@langfuse-db:5432/postgres
+  #     NEXTAUTH_SECRET: change-me
+  #     SALT: change-me
+  #   depends_on:
+  #     - langfuse-db
+  # langfuse-db:
+  #   image: postgres:16-alpine
+  #   environment:
+  #     POSTGRES_PASSWORD: postgres
+  #   volumes:
+  #     - langfuse-db-data:/var/lib/postgresql/data
+
+# volumes:
+#   langfuse-db-data:

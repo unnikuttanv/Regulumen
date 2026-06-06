@@ -1,0 +1,45 @@
+# ReguLumen — pinned runtime + dev dependencies
+# Python >= 3.13 required.
+# These pins are the exact versions verified working (266 tests pass). Notably
+# litellm constrains pydantic to < 2.13, so pydantic is pinned to 2.12.5
+# (NOT 2.13.x) — bumping it breaks `pip install` resolution.
+# Install minimal dev set first:  pip install pytest pydantic pydantic-settings ruff
+# Install everything:             pip install -r requirements.txt
+
+# --- Web / API layer ---
+fastapi==0.136.3
+uvicorn==0.48.0
+
+# --- UI layer ---
+gradio==6.15.2
+
+# --- Vector store ---
+chromadb==1.5.9
+
+# --- Retrieval ---
+rank-bm25==0.2.2
+
+# --- LLM gateway ---
+litellm==1.83.7
+
+# --- Orchestration (multi-step Q&A graph with a refine loop) ---
+langgraph==0.3.34
+langchain-core==0.3.86
+
+# --- HTTP client ---
+httpx==0.28.1
+
+# --- Settings & validation (v2) ---
+# pydantic held at 2.12.5 by litellm's constraint (< 2.13); do not bump without
+# re-checking litellm compatibility.
+pydantic==2.12.5
+pydantic-settings==2.14.1
+
+# --- Document ingestion ---
+pypdf==6.12.2
+beautifulsoup4==4.12.3
+lxml==6.1.1
+
+# --- Dev / test ---
+pytest==9.0.3
+ruff==0.15.15

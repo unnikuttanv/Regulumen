@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=72", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "regulumen"
+version = "0.1.0"
+description = "Citation-faithful regulatory RAG assistant for medical-device compliance."
+requires-python = ">=3.13"
+readme = "README.md"
+license = { text = "MIT" }
+dependencies = []
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+ignore = []
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "live: tests that hit the real network/HF API (skipped unless a token is set)",
+]
+filterwarnings = [
+    # Upstream issue: langgraph calls the deprecated asyncio.iscoroutinefunction
+    # (removal slated for Python 3.16). Targeted ignore — match by message AND
+    # module=langgraph so genuine project DeprecationWarnings stay visible.
+    "ignore:'asyncio.iscoroutinefunction' is deprecated.*:DeprecationWarning:langgraph",
+]

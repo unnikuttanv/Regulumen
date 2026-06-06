@@ -1,0 +1,42 @@
+# Keep the build context small and the image clean.
+# NOTE: corpus/ is intentionally NOT ignored — it must ship in the image so the
+# ingest service can build the index.
+
+# Virtual environments
+.venv/
+venv/
+
+# Python caches / build artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+build/
+dist/
+
+# Local vector store (rebuilt via the ingest service / mounted volume)
+.chroma/
+.chroma_*/
+*.chroma
+
+# Secrets — never bake into the image (provided at runtime via env_file)
+.env
+
+# VCS / tooling
+.git/
+.gitignore
+.ruff_cache/
+.pytest_cache/
+.sixth/
+.claude/
+
+# Tests (not needed at runtime)
+tests/
+
+# Eval artefacts
+eval/results/
+
+# Docs / editor noise
+docs/
+*.md
+!README.md
