@@ -1,0 +1,7 @@
+# Force LF line endings for files that run inside Linux containers.
+# A shell script committed with CRLF fails on Linux ("bash: \r: command not
+# found"), which would crash the HuggingFace Docker Space at boot.
+*.sh text eol=lf
+Dockerfile text eol=lf
+Dockerfile.hf text eol=lf
+*.py text eol=lf
