@@ -1,3 +1,14 @@
+---
+title: ReguLumen
+emoji: 📑
+colorFrom: indigo
+colorTo: blue
+sdk: docker
+app_port: 7860
+pinned: false
+short_description: Citation-faithful regulatory RAG for medical-device compliance.
+---
+
 # ReguLumen
 
 **A citation-faithful RAG assistant for medical-device compliance.** It answers
