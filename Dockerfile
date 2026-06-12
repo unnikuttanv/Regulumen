@@ -1,13 +1,22 @@
 # syntax=docker/dockerfile:1
 #
-# ReguLumen — multi-stage image for one-command local spin-up.
+# ReguLumen — HuggingFace Space (Docker SDK) image.
 #
-# Embeddings are a HOSTED HTTP API (HuggingFace Inference, via httpx), so the
-# image stays lean: NO torch / sentence-transformers. The heaviest dependency
-# pulled in is chromadb (which brings onnxruntime); that is accepted.
+# This is the HF-Spaces variant of the local Dockerfile. It differs in three
+# Space-specific ways that the local image deliberately does NOT have:
 #
-# The image can run EITHER the API or the UI — the CMD is overridable, so
-# docker-compose points each service at the right command.
+#   1. Runs as a NON-ROOT user with UID 1000 (HF runs containers as uid 1000;
+#      a root-only image fails to write its data).
+#   2. Serves a SINGLE port — the Gradio UI on 0.0.0.0:7860 (HF exposes one
+#      port, declared via `app_port` in the README front-matter). The UI imports
+#      the core in-process, so it is a complete app on its own.
+#   3. Ingests-then-launches at boot: scripts/hf_startup.sh builds the Chroma
+#      index from the bundled corpus, then execs the UI. Secrets
+#      (REGULUMEN_GROQ_API_KEY / REGULUMEN_HF_API_TOKEN) arrive at RUNTIME as HF
+#      Space secrets — they are NEVER baked into this image.
+#
+# As with the local image, embeddings are a hosted HTTP API, so the image stays
+# lean: NO torch / sentence-transformers. chromadb (onnxruntime) is accepted.
 
 # ---------------------------------------------------------------------------
 # Stage 1: builder — install dependencies + the package into a venv.
@@ -34,33 +43,44 @@ COPY src/ ./src/
 RUN pip install -e .
 
 # ---------------------------------------------------------------------------
-# Stage 2: runtime — slim image with only the venv + app code + corpus.
+# Stage 2: runtime — slim image, runs as the non-root `user` (uid 1000).
 # ---------------------------------------------------------------------------
 FROM python:3.13-slim AS runtime
 
-ENV PATH="/opt/venv/bin:$PATH" \
+# Create a non-root user with UID 1000 + a real home (HF requirement).
+RUN useradd --create-home --uid 1000 user
+
+ENV HOME=/home/user \
+    PATH="/opt/venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    REGULUMEN_CHROMA_PATH=/app/.chroma
+    # Chroma index must live somewhere `user` (uid 1000) can write.
+    REGULUMEN_CHROMA_PATH=/home/user/app/.chroma \
+    # Make Gradio bind on all interfaces inside the container on the HF port.
+    GRADIO_SERVER_NAME=0.0.0.0 \
+    GRADIO_SERVER_PORT=7860
 
-WORKDIR /app
+# App lives under the user's home so the whole tree is user-owned + writable.
+WORKDIR /home/user/app
 
-# Copy the pre-built virtualenv from the builder stage.
-COPY --from=builder /opt/venv /opt/venv
+# Copy the pre-built virtualenv from the builder stage (owned by user).
+COPY --from=builder --chown=user:user /opt/venv /opt/venv
 
-# Copy application code + the editable-install metadata.
-COPY pyproject.toml README.md ./
-COPY src/ ./src/
-COPY scripts/ ./scripts/
-# Keep the corpus IN the image so the ingest service can populate the index.
-COPY corpus/ ./corpus/
+# Copy application code + metadata + the bundled corpus (all owned by user).
+COPY --chown=user:user pyproject.toml README.md ./
+COPY --chown=user:user src/ ./src/
+COPY --chown=user:user scripts/ ./scripts/
+# Keep the corpus IN the image so startup ingest can populate the index.
+COPY --chown=user:user corpus/ ./corpus/
 
 # Re-install the package metadata against the copied src/ (cheap; no deps).
 RUN pip install --no-deps -e .
 
-# API on 8000, Gradio UI on 7860. Both are documented; compose picks one each.
-EXPOSE 8000 7860
+# Drop privileges: everything below runs as uid 1000.
+USER user
 
-# Default to the API; compose / `docker run ... <cmd>` overrides for the UI
-# or the one-shot ingest job.
-CMD ["uvicorn", "regulumen.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# HF Spaces expose ONE port; serve the Gradio UI here.
+EXPOSE 7860
+
+# Ingest-then-launch. Uses bash so the script's graceful-degrade logic runs.
+CMD ["bash", "scripts/hf_startup.sh"]
