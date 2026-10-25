@@ -21,3 +21,6 @@ eval/results/
 # Test / build caches
 .pytest_cache/
 *.egg-info/
+
+# Local tooling
+.claude/

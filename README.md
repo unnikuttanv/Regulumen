@@ -244,7 +244,10 @@ your licensed copy of any standard for the authoritative requirements.
   Q&A refine loop is shipped; next is multi-hop reasoning across clauses).
 - An MCP server to expose ReguLumen to other tools.
 - LiteLLM Proxy for org-wide cost control.
-- Phase 2: a live HuggingFace Space demo.
+- ~~Phase 2: a HuggingFace Space demo~~ — Docker Space deployment shipped
+  (see [docs/HF_DEPLOY.md](docs/HF_DEPLOY.md)).
+
+The full, prioritised task list lives in **[ROADMAP.md](ROADMAP.md)**.
 
 ## Project layout
 
@@ -279,3 +282,9 @@ The 2 skipped tests are live network checks (real Groq / HuggingFace calls),
 gated on the API keys and skipped by default. Everything else runs **fully
 offline** using deterministic fakes for the LLM and embeddings, so the suite is
 fast and reproducible without any keys.
+
+## License
+
+[Apache License 2.0](LICENSE) © 2026 Unnikuttan Vijayan Velamkudy. Regulatory
+source documents fetched by `scripts/fetch_corpus.py` remain under their
+publishers' terms and are not redistributed in this repository.
